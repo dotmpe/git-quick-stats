@@ -829,6 +829,105 @@ function suggestReviewers() {
     }' | column -t -s,
 }
 
+
+function changes () {
+    local ifs=$IFS rev deletions insertions
+    for rev in $( git rev-list --all )
+    do
+        IFS=$'\n'
+        for stat in $( git show --stat $rev | tail -n 1 | cut -d' ' -f5,7 )
+        do
+            IFS=$ifs
+            insertions=${stat// *}
+            deletions=${stat//* }
+            echo -e "$insertions\t$deletions\t$rev"
+        done
+    done | sort -nr
+    IFS=$ifs
+}
+
+
+function changesByAuthor() {
+    # pathspec
+    local ifs=$IFS author rev stat deletions insertions
+    echo -e "inserted\tdeleted\tauthor"
+    IFS=$'\n'
+    for author in $( git -c log.showSignature=false log --use-mailmap $_merges "$_since" "$_until" \
+      --format='%aN' $_log_options $_pathspec | sort -u)
+    do
+        IFS=$ifs
+        deletions=0
+        insertions=0
+        for rev in $( git -c log.showSignature=false log --use-mailmap $_merges "$_since" "$_until" \
+            --author="$author" \
+            --pretty=%h $_log_options $_pathspec )
+        do
+            IFS=$'\n'
+            for stat in $( git show --stat $rev | tail -n 1 | cut -d' ' -f5,7 )
+            do
+                IFS=$ifs
+                insertions=$(( $insertions + ${stat// *} ))
+                deletions=$(( $deletions + ${stat//* } ))
+            done
+        done
+        echo -e "$insertions\t$deletions\t$author"
+
+    done | sort -nr
+    IFS=$ifs
+}
+
+function changesByMonth() {
+    false
+}
+
+function changesPerYear() {
+    local ifs=$IFS rev stat
+    local year startYear endYear __since __until
+    startYear=$(echo "$_since" | sed -E 's/^.* ([0-9]{4})( .*)?$/\1/')
+    endYear=$(echo "$_until" | sed -E 's/^.* ([0-9]{4})( .*)?$/\1/')
+
+    echo -e "inserted\tdeleted\tyear"
+    for year in $(seq "$startYear" "$endYear")
+    do
+        if [ "$year" = "$startYear" ]
+        then
+            __since=$_since
+            __until="--until=$year-12-31"
+        elif [ "$year" = "$endYear" ]
+        then
+            __since="--since=$year-01-01"
+            __until=$_until
+        else
+            __since="--since=$year-01-01"
+            __until="--until=$year-12-31"
+        fi
+
+        local deletions=0 insertions=0
+        for rev in $(git -c log.showSignature=false shortlog \
+            -n $_merges --format='%h' \
+            "$__since" "$__until" $_log_options | grep -Po '[0-9a-f]{7,}')
+        do
+            IFS=$'\n'
+            for stat in $( git show --stat $rev | tail -n 1 | cut -d' ' -f5,7 )
+            do
+                IFS=$ifs
+                insertions=$(( $insertions + ${stat// *} ))
+                deletions=$(( $deletions + ${stat//* } ))
+            done
+        done
+        echo -e "$insertions\t$deletions\t$year"
+    done
+}
+
+function changesByWeekday() {
+  false
+}
+
+function changesByHour() {
+  false
+}
+
+
 ################################################################################
 # MAIN
 
@@ -884,6 +983,9 @@ if [[ "$#" -eq 1 ]]; then
         # LIST OPTIONS
         -b|--branch-tree) branchTree;;
         -D|--branches-by-date) branchesByDate;;
+           --changes ) changes;;
+           --changes-by-author ) changesByAuthor;;
+           --changes-per-year ) changesPerYear ;;
         -C|--contributors) contributors;;
         -a|--commits-per-author) commitsPerAuthor;;
         -d|--commits-per-day) commitsPerDay;;
@@ -976,6 +1078,10 @@ while [[ "${opt}" != "" ]]; do
            done
            commitsByTimezone "${author}"; showMenu;;
        20) suggestReviewers; showMenu;;
+       21)
+         #changesByFile
+         #changesByPeriod
+         changesByAuthor; showMenu;;
        q|"\n") exit;;
        *) clear; optionPicked "Pick an option from the menu"; showMenu;;
     esac
