@@ -529,7 +529,7 @@ function jsonOutput() {
     # TODO: Can we shorten this pretty format line? Quick experiment shows that
     #       it does not properly respect \ and interprets them literally.
     git -c log.showSignature=false log --use-mailmap $_merges "$_since" "$_until" $_log_options \
-        --pretty=format:'{%n  "commit": "%H",%n  "abbreviated_commit": "%h",%n  "tree": "%T",%n  "abbreviated_tree": "%t",%n  "parent": "%P",%n  "abbreviated_parent": "%p",%n  "refs": "%D",%n  "encoding": "%e",%n  "subject": "%s",%n  "sanitized_subject_line": "%f",%n  "body": "%b",%n  "commit_notes": "%N",%n  "author": {%n    "name": "%aN",%n    "email": "%aE",%n    "date": "%aD"%n  },%n  "commiter": {%n    "name": "%cN",%n    "email": "%cE",%n    "date": "%cD"%n  }%n},' \
+        --pretty=format:'{%n  "commit": "%H",%n  "abbreviated_commit": "%h",%n  "tree": "%T",%n  "abbreviated_tree": "%t",%n  "parent": "%P",%n  "abbreviated_parent": "%p",%n  "refs": "%D",%n  "encoding": "%e",%n  "subject": "%s",%n  "sanitized_subject_line": "%f",%n  "body": "%b",%n  "commit_notes": "%N",%n  "author": {%n    "name": "%aN",%n    "email": "%aE",%n    "date": "%aD"%n  },%n  "commiter": {%n    "name": "%cN",%n    "email": "%cE",%n    "date": "%cD"%n  }%n},' $_pathspec \
         | sed "$ s/,$//" \
         | sed ':a;N;$!ba;s/\r\n\([^{]\)/\\n\1/g' \
         | awk 'BEGIN { print("[") } { print($0) } END { print("]") }' \
@@ -551,7 +551,7 @@ function branchTree() {
     git -c log.showSignature=false log --use-mailmap --graph --abbrev-commit \
         "$_since" "$_until" --decorate \
         --format=format:'--+ Commit:  %h %n  | Date:    %aD (%ar) %n''  | Message: %s %d %n''  + Author:  %aN %n' \
-        --all $_log_options | head -n $((_limit*5))
+        --all $_log_options $_pathspec | head -n $((_limit*5))
 }
 
 ################################################################################
@@ -650,7 +650,7 @@ function commitsByYear() {
 
         echo -en "\t$year\t"
         git -c log.showSignature=false shortlog -n $_merges --format='%ad %s' \
-            "$__since" "$__until" $_log_options | grep -cE \
+            "$__since" "$__until" $_log_options $_pathspec | grep -cE \
               " \w\w\w [0-9]{1,2} [0-9][0-9]:[0-9][0-9]:[0-9][0-9] $year " \
                 || continue
     done | awk '{
@@ -684,7 +684,7 @@ function commitsByMonth() {
     do
         echo -en "\t$i\t"
         git -c log.showSignature=false shortlog -n $_merges --format='%ad %s' \
-            "$_since" "$_until" $_log_options |
+            "$_since" "$_until" $_log_options $_pathspec |
             grep -cE " \w\w\w $i [0-9]{1,2} " || continue
     done | awk '{
         count[$1] = $2
@@ -717,7 +717,7 @@ function commitsByWeekday() {
     do
         echo -en "\t$counter\t$i\t"
         git -c log.showSignature=false shortlog -n $_merges --format='%ad %s' \
-            "$_since" "$_until" $_log_options |
+            "$_since" "$_until" $_log_options $_pathspec |
             grep -cE "^ * $i \w\w\w [0-9]{1,2} " || continue
         counter=$((counter+1))
     done | awk '{
@@ -765,7 +765,7 @@ function commitsByHour() {
     do
         echo -ne "\t$i\t"
         git -c log.showSignature=false shortlog -n $_merges --format='%ad %s' \
-            "${_author}" "$_since" "$_until" $_log_options |
+            "${_author}" "$_since" "$_until" $_log_options $_pathspec |
             grep -cE '[0-9] '$i':[0-9]' || continue
     done | awk '{
         count[$1] = $2
